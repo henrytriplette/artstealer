@@ -1,0 +1,5 @@
+venv
+
+download/*.jpg
+download/*.jpeg
+download/*.png
