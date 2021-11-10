@@ -6,6 +6,7 @@ import random
 import shutil
 from datetime import datetime
 
+import PIL
 from PIL import Image, ImageChops, ImageEnhance, ImageGrab, ImageOps
 
 def saveCanvasAsPng(canvas,root,fileName):
@@ -349,21 +350,29 @@ def cropToAspectRatio(image, ratio_x, ratio_y):
         width, height = image.size
         return image.crop((
             0, (rx/2),
-            width, height - (rx/2),
+            width, height - (rx/2)
         ))
 
     def crop_width(image, rx):
-        width, height = image.size
-        return image.crop((
-            (rx/2), 0,
-            width - (rx/2), height,
-        ))
+        left = 155
+        top = 65
+        right = 360
+        bottom = 270
+
+        # Cropped image of above dimension
+        # (It will not change original image)
+        return image.crop((left, top, right, bottom))
+        # width, height = image.size
+        # return image.crop((
+        #     (rx/2), 0,
+        #     width - (rx/2), height
+        # ))
 
     width, height = image.size
 
     # Find the delta change.
-    rxheight = ((width / ratio_x) * ratio_y) - height
-    rxwidth  = ((height / ratio_y) * ratio_x) - width
+    rxheight = round(((width / ratio_x) * ratio_y) - height)
+    rxwidth  = round(((height / ratio_y) * ratio_x) - width)
 
     # Can only crop pixels, not add them.
     if rxheight < 0 and rxwidth < 0:
@@ -465,24 +474,21 @@ def pasteWithMask(image, imageCopy):
 
     return output
 
-def resize_and_crop(img_path, modified_path, size, crop_type='middle'):
+def resize_and_crop(img, size, crop_type='middle'):
     """
     Resize and crop an image to fit the specified size.
 
     args:
-    img_path: path for the image to resize.
-    modified_path: path to store the modified image.
+    img: image to resize.
     size: `(width, height)` tuple.
     crop_type: can be 'top', 'middle' or 'bottom', depending on this
     value, the image will cropped getting the 'top/left', 'middle' or
     'bottom/right' of the image to fit the size.
     raises:
-    Exception: if can not open the file in img_path of there is problems
-    to save the image.
     ValueError: if an invalid `crop_type` is provided.
     """
     # If height is higher we resize vertically, if not we resize horizontally
-    img = Image.open(img_path)
+
     # Get current and desired ratio for the images
     img_ratio = img.size[0] / float(img.size[1])
     ratio = size[0] / float(size[1])
@@ -519,4 +525,4 @@ def resize_and_crop(img_path, modified_path, size, crop_type='middle'):
         img = img.resize((size[0], size[1]),
             Image.ANTIALIAS)
     # If the scale is the same, we do not need to crop
-    img.save(modified_path)
+    return img

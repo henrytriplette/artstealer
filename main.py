@@ -1,6 +1,12 @@
 import asyncio
 import re
 import os
+import time
+import random
+import configparser
+import subprocess
+
+from datetime import datetime
 
 # Web
 import requests
@@ -13,6 +19,14 @@ from cv2 import dnn_superres
 
 # Images manipulation
 from PIL import Image
+
+import postprocess_base
+import postprocess_utility
+import postprocess_svg
+
+# Read Configuration
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 # Create an SR object
 sr = dnn_superres.DnnSuperResImpl_create()
@@ -42,48 +56,112 @@ async def main():
     page_content = await page.content()
 
     # Process extracted content with BeautifulSoup
-    soup = BeautifulSoup(page_content, "html.parser")
-    images = soup.find_all("img", {"class": "main_image"})
-    for image in images:
-
-        # Get url from parameter
-        url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
-
-        # Clearup
-        url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
-
-        # Get filename
-        filename = os.path.basename(url)
-
-        # Fetch file
-        response = requests.get(url)
-
-        # Save file
-        if response.status_code == 200:
-            with open("download/" + filename, 'wb') as f:
-                f.write(response.content)
-
-                # Read image
-                image = cv2.imread("download/" + filename)
-
-                # Upscale the image
-                result = sr.upsample(image)
-
-                # Save the image
-                cv2.imwrite("download/" + filename, result)
+    # soup = BeautifulSoup(page_content, "html.parser")
+    # images = soup.find_all("img", {"class": "main_image"})
+    # for image in images:
+    #
+    #     # Get url from parameter
+    #     url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
+    #
+    #     # Clearup
+    #     url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
+    #
+    #     # Get filename
+    #     filename = os.path.basename(url)
+    #
+    #     # Fetch file
+    #     response = requests.get(url)
+    #
+    #     # Save file
+    #     if response.status_code == 200:
+    #         with open("download/" + filename, 'wb') as f:
+    #             f.write(response.content)
+    #
+    #             # Read image
+    #             image = cv2.imread("download/" + filename)
+    #
+    #             # Upscale the image
+    #             result = sr.upsample(image)
+    #
+    #             # Save the image
+    #             cv2.imwrite("download/" + filename, result)
 
     # Check images folder for broken files
     for filename in os.listdir('download/'):
         if filename.endswith('.jpeg'):
             try:
-                img = Image.open('download/'+filename)  # open the image file
-                img.verify()  # verify that it is, in fact an image
+                image = Image.open('download/'+filename)  # open the image file
+                image.verify()  # verify that it is, in fact an image
+
             except (IOError, SyntaxError) as e:
                 print(filename)
                 os.remove('download/'+filename)
 
+    # Postprocessing
+    for filename in os.listdir('download/'):
+        if filename.endswith('.jpeg'):
+            try:
+                image = Image.open('download/'+filename)  # open the image file
+
+                # Convert to RGBA
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+
+                # Scale image to instagram size
+                image = postprocess_base.resize_and_crop(image, [1086, 1536])
+
+                # Image postprocessing
+                # image = postprocess_base.contrastStretch(image)
+                image = postprocess_base.imageSharpness(image, 1.25)
+                image = postprocess_base.imageFlipLeftRight(image)
+
+                # Save the processed image
+                single_datestring = datetime.strftime(datetime.now(), '%Y-%m-%d_%H.%M.%S')
+                photo_path = '%s/%s_%s_single.jpg' % ('temp', single_datestring, postprocess_utility.id_generator(8))
+                filename = postprocess_base.SaveImage(image, photo_path)
+                print('Saved ' + photo_path)
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
+    # Conversion
+    for filename in os.listdir('temp/'):
+        if filename.endswith('.jpg'):
+            try:
+                name, extension = os.path.splitext(filename)
+
+                inputFile = 'temp/' + filename
+                outputFile = 'temp/' + name + '.svg'
+
+                args = postprocess_svg.generateFlowImageArgs(inputFile, outputFile)
+
+                rendering = subprocess.Popen(args)
+                rendering.wait() # Hold on till process is finished
+
+                print('Processed ' + outputFile)
+
+                # Optimize file
+                args = 'vpype read "'
+                args += str('temp/' + outputFile) + '"'
+                args += ' linemerge --tolerance 0.1mm linesort'
+                args += ' write "' + str(outputFile) + '"'
+
+                rendering = subprocess.Popen(args)
+                rendering.wait() # Hold on till process is finished
+
+                print('Optimized ' + outputFile)
+
+                # Generate preview
+                inputFile = 'temp/' + name + '.svg'
+                outputFile = 'temp/' + name + '.png'
+
+                postprocess_svg.generateSvgPreview(inputFile, outputFile)
+
+                print('Previewd ' + outputFile)
+
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
     # Close browser
     await browser.close()
-
 
 asyncio.get_event_loop().run_until_complete(main())
