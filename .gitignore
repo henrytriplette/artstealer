@@ -1,12 +1,13 @@
 venv
 __pycache__
 
-download/*.jpg
 download/*.jpeg
-download/*.png
+
 temp/*.jpg
-temp/*.jpeg
 temp/*.png
+temp/*.svg
+
 processed/*.jpg
 processed/*.jpeg
 processed/*.png
+processed/*.svg

@@ -20,6 +20,11 @@ from cv2 import dnn_superres
 # Images manipulation
 from PIL import Image
 
+# Google Drive upload
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
+
+# Custom
 import postprocess_base
 import postprocess_utility
 import postprocess_svg
@@ -41,7 +46,34 @@ sr.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
 sr.setModel("edsr", 3)
 
+# # Google Drive
+# drive = False
+# if config['upload']['googledrive'] == True:
+#    # Below code does the authentication
+#     gauth = GoogleAuth()
+#
+#     # Creates local webserver and auto handles authentication.
+#     gauth.LocalWebserverAuth()
+#     drive = GoogleDrive(gauth)
+
+# Main function
 async def main():
+
+    # Clear Start
+    for filename in os.listdir('temp/'):
+        if filename != '.gitkeep':
+            try:
+                os.remove('temp/'+filename)
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
+    for filename in os.listdir('download/'):
+        if filename.endswith('.jpeg'):
+            try:
+                os.remove('download/'+filename)
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
     # Launch the browser
     browser = await launch()
 
@@ -55,36 +87,44 @@ async def main():
     await page.goto(page_path)
     page_content = await page.content()
 
+    # Close browser
+    await browser.close()
+
     # Process extracted content with BeautifulSoup
-    # soup = BeautifulSoup(page_content, "html.parser")
-    # images = soup.find_all("img", {"class": "main_image"})
-    # for image in images:
-    #
-    #     # Get url from parameter
-    #     url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
-    #
-    #     # Clearup
-    #     url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
-    #
-    #     # Get filename
-    #     filename = os.path.basename(url)
-    #
-    #     # Fetch file
-    #     response = requests.get(url)
-    #
-    #     # Save file
-    #     if response.status_code == 200:
-    #         with open("download/" + filename, 'wb') as f:
-    #             f.write(response.content)
-    #
-    #             # Read image
-    #             image = cv2.imread("download/" + filename)
-    #
-    #             # Upscale the image
-    #             result = sr.upsample(image)
-    #
-    #             # Save the image
-    #             cv2.imwrite("download/" + filename, result)
+    soup = BeautifulSoup(page_content, "html.parser")
+    images = soup.find_all("img", {"class": "main_image"})
+
+    # print(images)
+    images = images[-5:]    # Will hold only last 5 images
+    # print(images)
+
+    for image in images:
+
+        # Get url from parameter
+        url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
+
+        # Clearup
+        url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
+
+        # Get filename
+        filename = os.path.basename(url)
+
+        # Fetch file
+        response = requests.get(url)
+
+        # Save file
+        if response.status_code == 200:
+            with open("download/" + filename, 'wb') as f:
+                f.write(response.content)
+
+                # Read image
+                image = cv2.imread("download/" + filename)
+
+                # Upscale the image
+                result = sr.upsample(image)
+
+                # Save the image
+                cv2.imwrite("download/" + filename, result)
 
     # Check images folder for broken files
     for filename in os.listdir('download/'):
@@ -141,7 +181,7 @@ async def main():
 
                 # Optimize file
                 args = 'vpype read "'
-                args += str('temp/' + outputFile) + '"'
+                args += str(outputFile) + '"'
                 args += ' linemerge --tolerance 0.1mm linesort'
                 args += ' write "' + str(outputFile) + '"'
 
@@ -156,12 +196,54 @@ async def main():
 
                 postprocess_svg.generateSvgPreview(inputFile, outputFile)
 
-                print('Previewd ' + outputFile)
+                print('Preview ' + outputFile)
+
+                # Generate hpgl
+                inputFile = 'temp/' + name + '.svg'
+                outputFile = 'temp/' + name + '.hpgl'
+
+                args = postprocess_svg.generateHpglConversionArgs(inputFile, outputFile, config['hpgl'])
+
+                rendering = subprocess.Popen(args)
+                rendering.wait() # Hold on till process is finished
+
+                print('Converted ' + outputFile)
 
             except (IOError, SyntaxError) as e:
                 print(filename)
 
-    # Close browser
-    await browser.close()
+    # Move to processed
+    for filename in os.listdir('temp/'):
+        if filename != '.gitkeep':
+            try:
+                os.rename('temp/' + filename, 'processed/' + filename)
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
+    # # Upload all files
+    # if config['upload']['googledrive'] == True
+    #     for filename in os.listdir('processed/'):
+    #         if filename != '.gitkeep':
+    #             try:
+    #                 f = drive.CreateFile({'title': filename})
+    #                 f.SetContentFile(os.path.join('processed/', filename))
+    #                 f.Upload()
+    #
+    #                 # Due to a known bug in pydrive if we
+    #                 # don't empty the variable used to
+    #                 # upload the files to Google Drive the
+    #                 # file stays open in memory and causes a
+    #                 # memory leak, therefore preventing its
+    #                 # deletion
+    #                 f = None
+    #             except (IOError, SyntaxError) as e:
+    #                 print(filename)
+    # Clearup
+    for filename in os.listdir('download/'):
+        if filename.endswith('.jpeg'):
+            try:
+                os.remove('download/'+filename)
+            except (IOError, SyntaxError) as e:
+                print(filename)
 
 asyncio.get_event_loop().run_until_complete(main())

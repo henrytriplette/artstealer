@@ -7,3 +7,5 @@ Pillow
 vpype[all]
 git+https://github.com/serycjon/vpype-flow-imager.git#egg=vpype-flow-imager
 svglib
+configparser
+PyDrive2
