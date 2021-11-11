@@ -72,7 +72,7 @@ def generateHpglConversionArgs(inputFile, outputFile, values):
 
     args += ' write --device hp7475a'
 
-    args += ' --page-size ' + str(values['utility_pageSize'])
+    args += ' --page-size ' + str(values['page_scale'])
 
     if (values['page_orientation'] == 'landscape'):
         args += ' --landscape'

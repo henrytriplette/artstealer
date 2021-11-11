@@ -6,8 +6,10 @@ download/*.jpeg
 temp/*.jpg
 temp/*.png
 temp/*.svg
+temp/*.hpgl
 
 processed/*.jpg
 processed/*.jpeg
 processed/*.png
 processed/*.svg
+processed/*.hpgl

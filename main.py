@@ -5,6 +5,7 @@ import time
 import random
 import configparser
 import subprocess
+import argparse
 
 from datetime import datetime
 
@@ -57,7 +58,7 @@ sr.setModel("edsr", 3)
 #     drive = GoogleDrive(gauth)
 
 # Main function
-async def main():
+async def main(arguments):
 
     # Clear Start
     for filename in os.listdir('temp/'):
@@ -67,64 +68,66 @@ async def main():
             except (IOError, SyntaxError) as e:
                 print(filename)
 
-    for filename in os.listdir('download/'):
-        if filename.endswith('.jpeg'):
-            try:
-                os.remove('download/'+filename)
-            except (IOError, SyntaxError) as e:
-                print(filename)
+    if arguments.fetch == True:
+        for filename in os.listdir('download/'):
+            if filename.endswith('.jpeg'):
+                try:
+                    os.remove('download/'+filename)
+                except (IOError, SyntaxError) as e:
+                    print(filename)
 
-    # Launch the browser
-    browser = await launch()
+        # Launch the browser
+        browser = await launch()
 
-    # Open a new browser page
-    page = await browser.newPage()
+        # Open a new browser page
+        page = await browser.newPage()
 
-    # Create a URI for our test file
-    page_path = "https://www.artbreeder.com/browse"
+        # Create a URI for our test file
+        page_path = "https://www.artbreeder.com/browse"
 
-    # Open our test file in the opened page
-    await page.goto(page_path)
-    page_content = await page.content()
+        # Open our test file in the opened page
+        await page.goto(page_path)
+        page_content = await page.content()
 
-    # Close browser
-    await browser.close()
+        # Close browser
+        await browser.close()
 
-    # Process extracted content with BeautifulSoup
-    soup = BeautifulSoup(page_content, "html.parser")
-    images = soup.find_all("img", {"class": "main_image"})
+        # Process extracted content with BeautifulSoup
+        soup = BeautifulSoup(page_content, "html.parser")
+        images = soup.find_all("img", {"class": "main_image"})
 
-    # print(images)
-    images = images[-5:]    # Will hold only last 5 images
-    # print(images)
+        # print(images)
+        images = images[-10:]    # Will hold only last 10 images
+        # print(images)
 
-    for image in images:
+        for image in images:
 
-        # Get url from parameter
-        url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
+            # Get url from parameter
+            url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
 
-        # Clearup
-        url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
+            # Clearup
+            url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
 
-        # Get filename
-        filename = os.path.basename(url)
+            # Get filename
+            filename = os.path.basename(url)
 
-        # Fetch file
-        response = requests.get(url)
+            # Fetch file
+            response = requests.get(url)
 
-        # Save file
-        if response.status_code == 200:
-            with open("download/" + filename, 'wb') as f:
-                f.write(response.content)
+            # Save file
+            if response.status_code == 200:
+                with open("download/" + filename, 'wb') as f:
+                    f.write(response.content)
 
-                # Read image
-                image = cv2.imread("download/" + filename)
+                    if arguments.upscale == True:
+                        # Read image
+                        image = cv2.imread("download/" + filename)
 
-                # Upscale the image
-                result = sr.upsample(image)
+                        # Upscale the image
+                        result = sr.upsample(image)
 
-                # Save the image
-                cv2.imwrite("download/" + filename, result)
+                        # Save the image
+                        cv2.imwrite("download/" + filename, result)
 
     # Check images folder for broken files
     for filename in os.listdir('download/'):
@@ -238,12 +241,27 @@ async def main():
     #                 f = None
     #             except (IOError, SyntaxError) as e:
     #                 print(filename)
-    # Clearup
-    for filename in os.listdir('download/'):
-        if filename.endswith('.jpeg'):
-            try:
-                os.remove('download/'+filename)
-            except (IOError, SyntaxError) as e:
-                print(filename)
 
-asyncio.get_event_loop().run_until_complete(main())
+
+    # Clearup
+    if arguments.fetch == True:
+        for filename in os.listdir('download/'):
+            if filename.endswith('.jpeg'):
+                try:
+                    os.remove('download/'+filename)
+                except (IOError, SyntaxError) as e:
+                    print(filename)
+
+if __name__ == '__main__':
+
+    # Initialize
+    parser = argparse.ArgumentParser(description='Fetch some images, and process them.')
+    parser.add_argument('--fetch', dest='fetch', action='store_true', help='Download new images')
+    parser.add_argument('--no-fetch', dest='fetch', action='store_false', help='Use images already in download folder')
+    parser.add_argument('--upscale', dest='upscale', action='store_true', help='Upscale images using AI?')
+
+    parser.set_defaults(fetch=True, upscale=False)
+
+    arguments = parser.parse_args()
+
+    asyncio.get_event_loop().run_until_complete(main(arguments))
