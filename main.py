@@ -60,6 +60,11 @@ sr.setModel("edsr", 3)
 # Main function
 async def main(arguments):
 
+    ext_input = [".jpg", ".jpeg", ".png"]
+
+    # Directory checks
+    postprocess_utility.checkDirectory()
+
     # Clear Start
     for filename in os.listdir('temp/'):
         if filename != '.gitkeep':
@@ -70,7 +75,7 @@ async def main(arguments):
 
     if arguments.fetch == True:
         for filename in os.listdir('download/'):
-            if filename.endswith('.jpeg'):
+            if filename.endswith(tuple(ext_input)):
                 try:
                     os.remove('download/'+filename)
                 except (IOError, SyntaxError) as e:
@@ -131,7 +136,7 @@ async def main(arguments):
 
     # Check images folder for broken files
     for filename in os.listdir('download/'):
-        if filename.endswith('.jpeg'):
+        if filename.endswith(tuple(ext_input)):
             try:
                 image = Image.open('download/'+filename)  # open the image file
                 image.verify()  # verify that it is, in fact an image
@@ -142,7 +147,7 @@ async def main(arguments):
 
     # Postprocessing
     for filename in os.listdir('download/'):
-        if filename.endswith('.jpeg'):
+        if filename.endswith(tuple(ext_input)):
             try:
                 image = Image.open('download/'+filename)  # open the image file
 
