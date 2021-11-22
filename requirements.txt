@@ -9,3 +9,4 @@ git+https://github.com/serycjon/vpype-flow-imager.git#egg=vpype-flow-imager
 svglib
 configparser
 PyDrive2
+git+https://github.com/abey79/plottertools#egg=cmyksplit&subdirectory=cmyksplit

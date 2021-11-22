@@ -47,6 +47,16 @@ def generateFlowImageArgs(inputFile, outputFile):
 
     return args
 
+def generateCmykSplit(inputFile, invert):
+
+    # Generate parameters
+    args = 'cmyksplit'
+    if invert == True:
+        args += ' --invert' # Invert image
+    args += ' "' + str(inputFile) + '"' # Input
+
+    return args
+
 def generateSvgPreview(inputFile, outputFile):
 
     drawing = svg2rlg(inputFile)

@@ -22,11 +22,12 @@ from cv2 import dnn_superres
 from PIL import Image
 
 # Google Drive upload
-from pydrive2.auth import GoogleAuth
-from pydrive2.drive import GoogleDrive
+# from pydrive2.auth import GoogleAuth
+# from pydrive2.drive import GoogleDrive
 
 # Custom
 import postprocess_base
+import postprocess_fetch
 import postprocess_utility
 import postprocess_svg
 
@@ -89,6 +90,7 @@ async def main(arguments):
 
         # Create a URI for our test file
         page_path = "https://www.artbreeder.com/browse"
+        # page_path = "https://www.instagram.com/henrytriplette"
 
         # Open our test file in the opened page
         await page.goto(page_path)
@@ -97,42 +99,8 @@ async def main(arguments):
         # Close browser
         await browser.close()
 
-        # Process extracted content with BeautifulSoup
-        soup = BeautifulSoup(page_content, "html.parser")
-        images = soup.find_all("img", {"class": "main_image"})
-
-        # print(images)
-        images = images[-10:]    # Will hold only last 10 images
-        # print(images)
-
-        for image in images:
-
-            # Get url from parameter
-            url = re.search("(?P<url>https?://[^\s]+)", image["style"]).group("url")
-
-            # Clearup
-            url = url.replace('");', '').replace('?width=300', '').replace('_small', '')
-
-            # Get filename
-            filename = os.path.basename(url)
-
-            # Fetch file
-            response = requests.get(url)
-
-            # Save file
-            if response.status_code == 200:
-                with open("download/" + filename, 'wb') as f:
-                    f.write(response.content)
-
-                    if arguments.upscale == True:
-                        # Read image
-                        image = cv2.imread("download/" + filename)
-
-                        # Upscale the image
-                        result = sr.upsample(image)
-
-                        # Save the image
-                        cv2.imwrite("download/" + filename, result)
+        postprocess_fetch.fetchFromArtBreeder(page_content, arguments)
+        # postprocess_fetch.fetchFromInstagram(page_content, arguments)
 
     # Check images folder for broken files
     for filename in os.listdir('download/'):
@@ -144,6 +112,20 @@ async def main(arguments):
             except (IOError, SyntaxError) as e:
                 print(filename)
                 os.remove('download/'+filename)
+
+    # Postprocessing Upscale
+    if arguments.upscale == True:
+        for filename in os.listdir('download/'):
+            if filename.endswith(tuple(ext_input)):
+
+                # Read image
+                image = cv2.imread("download/" + filename)
+
+                # Upscale the image
+                result = sr.upsample(image)
+
+                # Save the image
+                cv2.imwrite("download/" + filename, result)
 
     # Postprocessing
     for filename in os.listdir('download/'):
@@ -171,62 +153,92 @@ async def main(arguments):
             except (IOError, SyntaxError) as e:
                 print(filename)
 
-    # Conversion
-    for filename in os.listdir('temp/'):
-        if filename.endswith('.jpg'):
-            try:
-                name, extension = os.path.splitext(filename)
+    # Conversion to CMYK Split
+    if arguments.color == True:
+        for filename in os.listdir('temp/'):
+            if filename.endswith('.jpg'):
+                try:
+                    name, extension = os.path.splitext(filename)
 
-                inputFile = 'temp/' + filename
-                outputFile = 'temp/' + name + '.svg'
+                    inputFile = 'temp/' + filename
+                    outputFile = 'temp/' + filename
 
-                args = postprocess_svg.generateFlowImageArgs(inputFile, outputFile)
+                    args = postprocess_svg.generateCmykSplit(inputFile, True)
 
-                rendering = subprocess.Popen(args)
-                rendering.wait() # Hold on till process is finished
+                    rendering = subprocess.Popen(args)
+                    rendering.wait() # Hold on till process is finished
 
-                print('Processed ' + outputFile)
-
-                # Optimize file
-                args = 'vpype read "'
-                args += str(outputFile) + '"'
-                args += ' linemerge --tolerance 0.1mm linesort'
-                args += ' write "' + str(outputFile) + '"'
-
-                rendering = subprocess.Popen(args)
-                rendering.wait() # Hold on till process is finished
-
-                print('Optimized ' + outputFile)
-
-                # Generate preview
-                inputFile = 'temp/' + name + '.svg'
-                outputFile = 'temp/' + name + '.png'
-
-                postprocess_svg.generateSvgPreview(inputFile, outputFile)
-
-                print('Preview ' + outputFile)
-
-                # Generate hpgl
-                inputFile = 'temp/' + name + '.svg'
-                outputFile = 'temp/' + name + '.hpgl'
-
-                args = postprocess_svg.generateHpglConversionArgs(inputFile, outputFile, config['hpgl'])
-
-                rendering = subprocess.Popen(args)
-                rendering.wait() # Hold on till process is finished
-
-                print('Converted ' + outputFile)
-
-            except (IOError, SyntaxError) as e:
-                print(filename)
-
-    # Move to processed
-    for filename in os.listdir('temp/'):
-        if filename != '.gitkeep':
-            try:
-                os.rename('temp/' + filename, 'processed/' + filename)
-            except (IOError, SyntaxError) as e:
-                print(filename)
+                    print('CMYK ' + outputFile)
+                except (IOError, SyntaxError) as e:
+                    print(filename)
+    #
+    # # Conversion to SVG
+    # for filename in os.listdir('temp/'):
+    #     if filename.endswith('.jpg'):
+    #         try:
+    #             name, extension = os.path.splitext(filename)
+    #
+    #             inputFile = 'temp/' + filename
+    #             outputFile = 'temp/' + name + '.svg'
+    #
+    #             args = postprocess_svg.generateFlowImageArgs(inputFile, outputFile)
+    #
+    #             rendering = subprocess.Popen(args)
+    #             rendering.wait() # Hold on till process is finished
+    #
+    #             print('Processed ' + outputFile)
+    #         except (IOError, SyntaxError) as e:
+    #             print(filename)
+    #
+    # # Conversion to HPGL
+    # for filename in os.listdir('temp/'):
+    #     if filename.endswith('.svg'):
+    #         try:
+    #             name, extension = os.path.splitext(filename)
+    #
+    #             inputFile = 'temp/' + filename
+    #             outputFile = 'temp/' + name + '.svg'
+    #
+    #             # Optimize file
+    #             args = 'vpype read "'
+    #             args += str(inputFile) + '"'
+    #             args += ' linemerge --tolerance 0.1mm linesort'
+    #             args += ' write "' + str(outputFile) + '"'
+    #
+    #             rendering = subprocess.Popen(args)
+    #             rendering.wait() # Hold on till process is finished
+    #
+    #             print('Optimized ' + outputFile)
+    #
+    #             # Generate preview
+    #             inputFile = 'temp/' + name + '.svg'
+    #             outputFile = 'temp/' + name + '.png'
+    #
+    #             postprocess_svg.generateSvgPreview(inputFile, outputFile)
+    #
+    #             print('Preview ' + outputFile)
+    #
+    #             # Generate hpgl
+    #             inputFile = 'temp/' + name + '.svg'
+    #             outputFile = 'temp/' + name + '.hpgl'
+    #
+    #             args = postprocess_svg.generateHpglConversionArgs(inputFile, outputFile, config['hpgl'])
+    #
+    #             rendering = subprocess.Popen(args)
+    #             rendering.wait() # Hold on till process is finished
+    #
+    #             print('Converted ' + outputFile)
+    #
+    #         except (IOError, SyntaxError) as e:
+    #             print(filename)
+    #
+    # # Move to processed
+    # for filename in os.listdir('temp/'):
+    #     if filename != '.gitkeep':
+    #         try:
+    #             os.rename('temp/' + filename, 'processed/' + filename)
+    #         except (IOError, SyntaxError) as e:
+    #             print(filename)
 
     # # Upload all files
     # if config['upload']['googledrive'] == True
@@ -247,11 +259,10 @@ async def main(arguments):
     #             except (IOError, SyntaxError) as e:
     #                 print(filename)
 
-
     # Clearup
     if arguments.fetch == True:
         for filename in os.listdir('download/'):
-            if filename.endswith('.jpeg'):
+            if filename.endswith(tuple(ext_input)):
                 try:
                     os.remove('download/'+filename)
                 except (IOError, SyntaxError) as e:
@@ -262,10 +273,12 @@ if __name__ == '__main__':
     # Initialize
     parser = argparse.ArgumentParser(description='Fetch some images, and process them.')
     parser.add_argument('--fetch', dest='fetch', action='store_true', help='Download new images')
+    parser.add_argument('--total', dest='total', type=int, default=10, help='Download how many images?')
     parser.add_argument('--no-fetch', dest='fetch', action='store_false', help='Use images already in download folder')
     parser.add_argument('--upscale', dest='upscale', action='store_true', help='Upscale images using AI?')
+    parser.add_argument('--color', dest='color', action='store_true', help='Split Images for CMYK print')
 
-    parser.set_defaults(fetch=True, upscale=False)
+    parser.set_defaults(fetch=True, upscale=False, color=False, total=10)
 
     arguments = parser.parse_args()
 
