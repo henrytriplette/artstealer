@@ -171,74 +171,80 @@ async def main(arguments):
                     print('CMYK ' + outputFile)
                 except (IOError, SyntaxError) as e:
                     print(filename)
-    #
-    # # Conversion to SVG
-    # for filename in os.listdir('temp/'):
-    #     if filename.endswith('.jpg'):
-    #         try:
-    #             name, extension = os.path.splitext(filename)
-    #
-    #             inputFile = 'temp/' + filename
-    #             outputFile = 'temp/' + name + '.svg'
-    #
-    #             args = postprocess_svg.generateFlowImageArgs(inputFile, outputFile)
-    #
-    #             rendering = subprocess.Popen(args)
-    #             rendering.wait() # Hold on till process is finished
-    #
-    #             print('Processed ' + outputFile)
-    #         except (IOError, SyntaxError) as e:
-    #             print(filename)
-    #
-    # # Conversion to HPGL
-    # for filename in os.listdir('temp/'):
-    #     if filename.endswith('.svg'):
-    #         try:
-    #             name, extension = os.path.splitext(filename)
-    #
-    #             inputFile = 'temp/' + filename
-    #             outputFile = 'temp/' + name + '.svg'
-    #
-    #             # Optimize file
-    #             args = 'vpype read "'
-    #             args += str(inputFile) + '"'
-    #             args += ' linemerge --tolerance 0.1mm linesort'
-    #             args += ' write "' + str(outputFile) + '"'
-    #
-    #             rendering = subprocess.Popen(args)
-    #             rendering.wait() # Hold on till process is finished
-    #
-    #             print('Optimized ' + outputFile)
-    #
-    #             # Generate preview
-    #             inputFile = 'temp/' + name + '.svg'
-    #             outputFile = 'temp/' + name + '.png'
-    #
-    #             postprocess_svg.generateSvgPreview(inputFile, outputFile)
-    #
-    #             print('Preview ' + outputFile)
-    #
-    #             # Generate hpgl
-    #             inputFile = 'temp/' + name + '.svg'
-    #             outputFile = 'temp/' + name + '.hpgl'
-    #
-    #             args = postprocess_svg.generateHpglConversionArgs(inputFile, outputFile, config['hpgl'])
-    #
-    #             rendering = subprocess.Popen(args)
-    #             rendering.wait() # Hold on till process is finished
-    #
-    #             print('Converted ' + outputFile)
-    #
-    #         except (IOError, SyntaxError) as e:
-    #             print(filename)
-    #
-    # # Move to processed
-    # for filename in os.listdir('temp/'):
-    #     if filename != '.gitkeep':
-    #         try:
-    #             os.rename('temp/' + filename, 'processed/' + filename)
-    #         except (IOError, SyntaxError) as e:
-    #             print(filename)
+
+        flowargs = postprocess_svg.generateFlowArgs()
+
+    # Conversion to SVG
+    for filename in os.listdir('temp/'):
+        if filename.endswith('.jpg'):
+            try:
+                name, extension = os.path.splitext(filename)
+
+                inputFile = 'temp/' + filename
+                outputFile = 'temp/' + name + '.svg'
+
+                # Randomize flowargs only if color is false
+                if arguments.color == False:
+                    flowargs = postprocess_svg.generateFlowArgs()
+
+                args = postprocess_svg.generateFlowImageArgs(inputFile, outputFile, flowargs)
+
+                rendering = subprocess.Popen(args)
+                rendering.wait() # Hold on till process is finished
+
+                print('Processed ' + outputFile)
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
+    # Conversion to HPGL
+    for filename in os.listdir('temp/'):
+        if filename.endswith('.svg'):
+            try:
+                name, extension = os.path.splitext(filename)
+
+                inputFile = 'temp/' + filename
+                outputFile = 'temp/' + name + '.svg'
+
+                # Optimize file
+                args = 'vpype read "'
+                args += str(inputFile) + '"'
+                args += ' linemerge --tolerance 0.1mm linesort'
+                args += ' write "' + str(outputFile) + '"'
+
+                rendering = subprocess.Popen(args)
+                rendering.wait() # Hold on till process is finished
+
+                print('Optimized ' + outputFile)
+
+                # Generate preview
+                inputFile = 'temp/' + name + '.svg'
+                outputFile = 'temp/' + name + '.png'
+
+                postprocess_svg.generateSvgPreview(inputFile, outputFile)
+
+                print('Preview ' + outputFile)
+
+                # Generate hpgl
+                inputFile = 'temp/' + name + '.svg'
+                outputFile = 'temp/' + name + '.hpgl'
+
+                args = postprocess_svg.generateHpglConversionArgs(inputFile, outputFile, config['hpgl'])
+
+                rendering = subprocess.Popen(args)
+                rendering.wait() # Hold on till process is finished
+
+                print('Converted ' + outputFile)
+
+            except (IOError, SyntaxError) as e:
+                print(filename)
+
+    # Move to processed
+    for filename in os.listdir('temp/'):
+        if filename != '.gitkeep':
+            try:
+                os.rename('temp/' + filename, 'processed/' + filename)
+            except (IOError, SyntaxError) as e:
+                print(filename)
 
     # # Upload all files
     # if config['upload']['googledrive'] == True

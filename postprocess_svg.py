@@ -5,8 +5,7 @@ from reportlab.graphics import renderPDF, renderPM
 
 import postprocess_utility
 
-def generateFlowImageArgs(inputFile, outputFile):
-
+def generateFlowArgs():
     values = {
         'vfi_noise_coeff': postprocess_utility.randrange_float(0.001, 0.010, 0.001), # Simplex noise coordinate multiplier. The smaller, the smoother the flow field.
         'vfi_n_fields': random.randint(1, 3), # Number of rotated copies of the flow field
@@ -24,6 +23,10 @@ def generateFlowImageArgs(inputFile, outputFile):
         'vfi_edge_field_multiplier': postprocess_utility.randrange_float(1, 5, 0.1),  # FLOAT 'Flow along image edges'
         'vfi_dark_field_multiplier': postprocess_utility.randrange_float(1, 5, 0.1), # FLOAT 'Flow swirling around dark image areas'
     }
+
+    return values
+
+def generateFlowImageArgs(inputFile, outputFile, values):
 
     # Generate parameters
     args = 'vpype flow_img'
